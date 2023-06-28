@@ -21,10 +21,10 @@ const layout = reactive({
 const R = layout.width / 2;
 
 const colorConfig = reactive({
-  light: '#ccc',
-  shallowlight: '#999',
-  shallowDark: '#666',
-  dark: '#333',
+  light: '#ffffff',
+  shallowlight: '#8e8d92',
+  shallowDark: '#2c2c2e',
+  dark: '#010101',
   night: '#5edfde',
   daylight: '#f7d500'
 })
@@ -43,8 +43,8 @@ onMounted(() => {
   supportState.value = canvas.context ? '支持Canvas' : '不支持Canvas'
   drawBackground()
   drawScale()
+  drawSparklesIcon(5000 - 500, 2900, layout.icon_size) // icon=1000x1000 
   drawSunlightIcon(5000 - 500, 6000, layout.icon_size) // icon=1000x1000 
-  drawSparklesIcon(0, 0, layout.icon_size) // icon=1000x1000 
 })
 
 const drawBackground = () => {
@@ -70,6 +70,7 @@ const drawLine = (start1, start2, end1, end2, color = '#000') => {
 }
 
 const drawScale = () => {
+  ctx.save();
   // 画制时钟刻度
   // 定义1°
   var pi = Math.PI * 2 / 360;
@@ -90,16 +91,13 @@ const drawScale = () => {
     drawLine(R + layout.scale_R * x, R + layout.scale_R * y, R + (layout.scale_R - lineLength) * x, R + (layout.scale_R - lineLength) * y, colorConfig.shallowlight)
   }
 }
-
 const drawSparklesIcon = (offsetX, offsetY, size = 100) => {
   const offsetObj = { offsetX, offsetY }
   ctx.save();
   ctx.miterLimit = 4;
-  const scale = size / 1000
-  // ctx.scale(scale, scale);
-  ctx.scale(0.01, 0.01);
-  ctx.save();
   ctx.fillStyle = colorConfig.night;  //填充颜色
+  const scale = size / 1000
+  ctx.scale(scale, scale);
   ctx.beginPath();
   offsetMoveTo(offsetObj, 488.009143, 231.497143);
   offsetBezierCurveTo(offsetObj, 493.129143, 231.497143, 495.707429, 228.498286, 497.005714, 223.78057099999998);
@@ -148,12 +146,11 @@ const drawSparklesIcon = (offsetX, offsetY, size = 100) => {
 }
 
 const drawSunlightIcon = (offsetX, offsetY, size = 100) => {
+  ctx.save();
   const scale = size / 1000
   const offsetObj = { offsetX, offsetY }
-  ctx.save();
   ctx.miterLimit = 4;
   ctx.scale(scale, scale);
-  ctx.save();
   ctx.fillStyle = colorConfig.daylight;  //填充颜色
   ctx.beginPath();
   offsetMoveTo(offsetObj, 549.302857, 84.297143);
