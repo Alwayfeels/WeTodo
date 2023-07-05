@@ -10,7 +10,6 @@
     <div>结束角度 {{ state.dragBarEndAngle }}</div>
     <div>isStartIconClick {{ state.isStartIconClick }}</div>
     <div>isEndIconClick {{ state.isEndIconClick }}</div>
-    <div>dragBarAngle {{ state.dragBarAngle }}</div>
     
   </div>
 </template>
@@ -41,8 +40,6 @@ const layout = reactive({
   drag_bar_scale_width: 20,
   centerX: computed(() => layout.width / 2),
   centerY: computed(() => layout.height / 2),
-  dragBarMinAngle: 20,
-  dragBarMaxAngle: 300
 });
 const colorConfig = reactive({
   light: '#ffffff',
@@ -60,7 +57,6 @@ const state = reactive({
   isEndIconClick: false, // 是否点击了尾部图标
   dragBarStartAngle: 45, // 拖拽条 开始角度
   dragBarEndAngle: 180, // 拖拽条 结束角度
-  dragBarAngle: computed(() => state.dragBarStartAngle > state.dragBarEndAngle ? 360 - state.dragBarStartAngle + state.dragBarEndAngle : state.dragBarEndAngle - state.dragBarStartAngle),
 })
 
 let canvasDom
@@ -136,7 +132,7 @@ function addCanvasEventListener() {
     state.isEndIconClick = isEndIconClick
     if (isStartIconClick || isEndIconClick) {
       state.clickAngle = Math.round(calculateAngle({ x: layout.centerX, y: layout.centerY, pointX: offsetX, pointY: offsetY }))
-      state.dragOffsetAngle = state.isStartIconClick ? state.clickAngle - state.dragBarStartAngle : state.clickAngle - state.dragBarEndAngle
+      state.dragOffsetAngle = state.clickAngle - state.dragBarStartAngle
       canvasDom.addEventListener('mousemove', onCanvasMouseMove)
     }
   })
@@ -158,29 +154,11 @@ function onCanvasMouseMove(event) {
   if (state.moveAngle === currAngle) return
   state.moveAngle = currAngle
   const newStartAngle = state.isStartIconClick ? Math.round(currAngle + state.dragOffsetAngle): state.dragBarStartAngle 
-  const newEndAngle = state.isEndIconClick ? Math.round(currAngle  + state.dragOffsetAngle): state.dragBarEndAngle
+  const newEndAngle = state.isEndIconClick ? Math.round(currAngle - currAngle + state.dragOffsetAngle): state.dragBarEndAngle
   console.log('拖拽偏转角度 => ', state.dragOffsetAngle);
 
   state.dragBarStartAngle = newStartAngle
   state.dragBarEndAngle = newEndAngle
-  if (state.dragBarAngle <= layout.dragBarMinAngle) {
-    console.log('\\\\\\\\\\\\\\\\\\');
-    if (state.isStartIconClick) {
-      state.dragBarEndAngle = (state.dragBarStartAngle + layout.dragBarMinAngle) % 360
-    }
-    if (state.isEndIconClick) {
-      state.dragBarStartAngle = (state.dragBarEndAngle - layout.dragBarMinAngle) % 360
-    }
-  }
-  if (state.dragBarAngle >= layout.dragBarMaxAngle) {
-    console.log('////////////');
-    if (state.isStartIconClick) {
-      state.dragBarEndAngle = (state.dragBarStartAngle + layout.dragBarMaxAngle) % 360
-    }
-    if (state.isEndIconClick) {
-      state.dragBarStartAngle = (state.dragBarEndAngle - layout.dragBarMaxAngle) % 360
-    }
-  }
   console.log('重绘角度 => ', newStartAngle, newEndAngle);
   drawDragBar(newStartAngle, newEndAngle)
 }
@@ -211,7 +189,7 @@ function rotateDragBar(angle) {
   ctx.rotate(angle * perAngle); // 45度角
 }
 
-function drawDragBar(startAngle = 0, endAngle = 90) {
+function drawDragBar(startAngle = 0, endAngle = 90, rotate) {
   if (startAngle >= 360 || endAngle >= 360) {
     startAngle = startAngle % 360
     endAngle = endAngle % 360
