@@ -3,6 +3,14 @@
     <canvas id="canvas" ref="canvasRef" class="canvas" :style="`width: ${layout.width}px; height: ${layout.height}px;`"
       :width="layout.width" :height="layout.height"></canvas>
     <div>{{ clockValue }}</div>
+    <div>点击角度 {{ state.clickAngle }}</div>
+    <div>当前角度 {{ state.moveAngle }}</div>
+    <div>转动角度差 {{ state.dragOffsetAngle }}</div>
+    <div>开始角度 {{ state.dragBarStartAngle }}</div>
+    <div>结束角度 {{ state.dragBarEndAngle }}</div>
+    <div>isStartIconClick {{ state.isStartIconClick }}</div>
+    <div>isEndIconClick {{ state.isEndIconClick }}</div>
+    
   </div>
 </template>
 
@@ -42,11 +50,13 @@ const colorConfig = reactive({
   daylight: '#f7d500'
 })
 const state = reactive({
-  clickAngle: null,
-  isStartIconClick: false,
-  isEndIconClick: false,
-  dragBarStartAngle: 45,
-  dragBarEndAngle: 190,
+  clickAngle: 0, // 点击初始角度，偏移量判断依据
+  moveAngle: 0, // 当前拖动角度
+  dragOffsetAngle: 0, // 点击角度和开始角度差,
+  isStartIconClick: false, // 是否点击了头部图标
+  isEndIconClick: false, // 是否点击了尾部图标
+  dragBarStartAngle: 45, // 拖拽条 开始角度
+  dragBarEndAngle: 180, // 拖拽条 结束角度
 })
 
 let canvasDom
@@ -67,21 +77,22 @@ onMounted(() => {
   canvas.context = ctx
   clockValue.value = canvas.context ? '无数据' : '不支持Canvas'
   drawClockBg()
+  ctx.save()
   drawDragBar(layout.dragBarStartAngleInit, layout.dragBarEndAngleInit)
-  // drawCircleAtPosition({
-  //   x: layout.centerX,
-  //   y: layout.centerY,
-  //   r: layout.drag_bar_R,
-  //   angle: 45,
-  //   circle_r: layout.drag_icon_size,
-  // })
-  // drawCircleAtPosition({
-  //   x: layout.centerX,
-  //   y: layout.centerY,
-  //   r: layout.drag_bar_R,
-  //   angle: 180,
-  //   circle_r: layout.drag_icon_size,
-  // })
+  drawCircleAtPosition({
+    x: layout.centerX,
+    y: layout.centerY,
+    r: layout.drag_bar_R,
+    angle: state.dragBarStartAngle,
+    circle_r: layout.drag_icon_size,
+  })
+  drawCircleAtPosition({
+    x: layout.centerX,
+    y: layout.centerY,
+    r: layout.drag_bar_R,
+    angle: state.dragBarEndAngle,
+    circle_r: layout.drag_icon_size,
+  })
   canvasDom = document.getElementById('canvas')
   addCanvasEventListener()
 })
@@ -89,9 +100,25 @@ onMounted(() => {
 function addCanvasEventListener() {
   canvasDom.addEventListener('mousedown', (event) => {
     const { offsetX, offsetY } = event
+    // 是否点击了dragbar
+    // const isClickDragBar = isPointInDragBar({
+    //   x: layout.centerX,
+    //   y: layout.centerY,
+    //   r: layout.drag_bar_R,
+    //   startAngle: state.dragBarStartAngle,
+    //   endAngle: state.dragBarEndAngle,
+    //   lineWidth: layout.drag_bar_width,
+    //   pointX: offsetX,
+    //   pointY: offsetY
+    // })
+    // if (isClickDragBar) {
+    //   console.log('rotate  eeeeeeeeee');
+    //   rotateDragBar(45)
+    // }
+    // console.log('isClickDragBar ??? => ', isClickDragBar);
     // 是否点击了dragbar图标
-    const [isStartIconClick, isEndIconClick] = ([45, 180]).map(angle => {
-      return isPointInCircle({
+    const [isStartIconClick, isEndIconClick] = ([state.dragBarStartAngle, state.dragBarEndAngle]).map(angle => {
+      return isClickInCircle({
         x: layout.centerX,
         y: layout.centerY,
         r: layout.drag_bar_R,
@@ -105,32 +132,49 @@ function addCanvasEventListener() {
     state.isEndIconClick = isEndIconClick
     if (isStartIconClick || isEndIconClick) {
       state.clickAngle = Math.round(calculateAngle({ x: layout.centerX, y: layout.centerY, pointX: offsetX, pointY: offsetY }))
-      console.log('click => ', state.clickAngle);
-      canvasDom.addEventListener('mousemove', addCanvasMoveListener)
+      state.dragOffsetAngle = state.clickAngle - state.dragBarStartAngle
+      canvasDom.addEventListener('mousemove', onCanvasMouseMove)
     }
   })
   canvasDom.addEventListener('mouseup', (event) => {
-    canvasDom.removeEventListener('mousemove', addCanvasMoveListener)
+    state.isStartIconClick = false
+    state.isEndIconClick = false
+    state.currAngle = 0
+    state.clickAngle = 0
+    canvasDom.removeEventListener('mousemove', onCanvasMouseMove)
   })
 }
 
-function addCanvasMoveListener(event) {
+/**
+ * @desc: 核心
+ */
+function onCanvasMouseMove(event) {
   const { offsetX, offsetY } = event
-  let angle = calculateAngle({ x: layout.centerX, y: layout.centerY, pointX: offsetX, pointY: offsetY })
-  console.log('move => ', Math.round(angle));
-  drawDragBar(offsetX, offsetY)
+  let currAngle = Math.round(calculateAngle({ x: layout.centerX, y: layout.centerY, pointX: offsetX, pointY: offsetY }))
+  if (state.moveAngle === currAngle) return
+  state.moveAngle = currAngle
+  const newStartAngle = state.isStartIconClick ? Math.round(currAngle + state.dragOffsetAngle): state.dragBarStartAngle 
+  const newEndAngle = state.isEndIconClick ? Math.round(currAngle - currAngle + state.dragOffsetAngle): state.dragBarEndAngle
+  console.log('拖拽偏转角度 => ', state.dragOffsetAngle);
+
+  state.dragBarStartAngle = newStartAngle
+  state.dragBarEndAngle = newEndAngle
+  console.log('重绘角度 => ', newStartAngle, newEndAngle);
+  drawDragBar(newStartAngle, newEndAngle)
 }
 
 function calculateAngle({ x, y, pointX, pointY }) {
-  // 计算点击坐标相对于原点连线的角度
-  var deltaX = pointX - x;
-  var deltaY = y - pointY; // 注意这里的符号，因为 canvas 的坐标系与数学坐标系 y 轴方向相反
-  var radian = Math.atan2(deltaY, deltaX);
-  var angle = radian * (180 / Math.PI);
-  // 将角度转换为正上方为0度
-  angle = (angle + 360) % 360;
+  var dx = pointX - x;
+  var dy = y - pointY;
+  var angle = Math.atan2(dx, dy) * (180 / Math.PI);
+  if (angle < 0) {
+    angle = 360 + angle;
+  } else if (angle >= 360) {
+    angle = angle % 360;
+  }
   return angle;
 }
+console.log('.....', calculateAngle({ x: 10, y: 10, pointX: 10, pointY: 20 }));
 
 function drawClockBg() {
   drawBackground()
@@ -139,13 +183,19 @@ function drawClockBg() {
   drawScale()
 }
 
+function rotateDragBar(angle) {
+  ctx.restore()
+  const perAngle = Math.PI / 180
+  ctx.rotate(angle * perAngle); // 45度角
+}
+
 function drawDragBar(startAngle = 0, endAngle = 90) {
-  const {dragBarStartAngle, dragBarEndAngle} = state
-  if (dragBarStartAngle === startAngle && dragBarEndAngle === endAngle) return
-  state.dragBarStartAngle = startAngle
-  state.dragBarEndAngle = endAngle
+  if (startAngle >= 360 || endAngle >= 360) {
+    startAngle = startAngle % 360
+    endAngle = endAngle % 360
+  }
+  clearRing(layout.centerX, layout.centerY, (layout.drag_bar_R - layout.drag_bar_width), (layout.drag_bar_R + layout.drag_bar_width))
   clockValue.value = `${startAngle}°-${endAngle}°: ${getTimeFromAngle(startAngle)}-${getTimeFromAngle(endAngle)}`
-  clearRing(layout.centerX, layout.centerY, layout.R1, layout.R2, colorConfig.dark)
   drawDragBarContent(layout.centerX, layout.centerY, layout.drag_bar_R, startAngle, endAngle, layout.drag_bar_width);
   drawLinesOnArc(layout.centerX, layout.centerY, layout.drag_bar_R, startAngle, endAngle, layout.drag_scale_length);
   drawImageOnArc(layout.centerX, layout.centerY, layout.drag_bar_R, startAngle, bed_icon, layout.drag_icon_size)
@@ -153,22 +203,25 @@ function drawDragBar(startAngle = 0, endAngle = 90) {
 }
 
 function drawCircleAtPosition({ x, y, r, angle, circle_r }) {
-  angle -= 90
   // 转换为弧度
-  angle = angle * Math.PI / 180;
+  const arc = (angle - 90) * Math.PI / 180;
 
   // 计算第二个圆的圆心坐标
-  var secondX = x + Math.cos(angle) * r;
-  var secondY = y + Math.sin(angle) * r;
+  var secondX = x + Math.cos(arc) * r;
+  var secondY = y + Math.sin(arc) * r;
 
   // 绘制圆
   ctx.beginPath();
   ctx.arc(secondX, secondY, circle_r, 0, 2 * Math.PI);
+  ctx.fillStyle = colorConfig.light
   ctx.fill();
 }
 
+/**
+ * @desc: 操作条
+ */
+
 function drawDragBarContent(x, y, r, startAngle, endAngle, arc_r) {
-  ctx.save()
   // 转换为弧度
   startAngle = (startAngle - 90) * Math.PI / 180;
   endAngle = (endAngle - 90) * Math.PI / 180;
@@ -181,49 +234,26 @@ function drawDragBarContent(x, y, r, startAngle, endAngle, arc_r) {
   ctx.stroke();
 }
 
-const drawBackground = () => {
-  ctx.save()
-  ctx.beginPath();
-  ctx.arc(layout.centerX, layout.centerY, layout.R1, 0, Math.PI * 2);
-  ctx.fillStyle = colorConfig.shallowDark;
-  ctx.fill
-  ctx.fill()
-  ctx.moveTo(layout.centerX + layout.R2, layout.centerY);
-  ctx.arc(layout.centerX, layout.centerY, layout.R2, 0, Math.PI * 2, true);
-  ctx.fillStyle = colorConfig.dark;
-  ctx.fill()
-  ctx.restore()
-}
-function drawRing( x, y, r1, r2, color) {
-  ctx.beginPath();
-  ctx.arc(x, y, r2, 0, 2 * Math.PI);
-  ctx.arc(x, y, r1, 0, 2 * Math.PI);
-  ctx.closePath();
+function isPointInDragBar({ x, y, r, startAngle, endAngle, lineWidth, pointX, pointY }) {
+  var dx = pointX - x;
+  var dy = pointY - y;
+  var distance = Math.sqrt(dx * dx + dy * dy);
 
-  ctx.lineWidth = r2 - r1;
-  ctx.strokeStyle = color;
-  ctx.stroke();
+  if (distance < r + lineWidth && distance > r - lineWidth) {
+    var angle = Math.atan2(dy, dx);
+    angle = (angle < 0) ? (angle + 2 * Math.PI) : angle;
+    // console.log('condition1 success; angle=>', angle);
+    return true
+    if (startAngle > endAngle) {
+      return angle >= startAngle || angle <= endAngle;
+    } else {
+      return angle >= startAngle && angle <= endAngle;
+    }
+  }
+  return false;
 }
 
-function clearRing(x, y, r1, r2, color) {
-  ctx.beginPath();
-  ctx.arc(x, y, r2, 0, 2 * Math.PI);
-  ctx.arc(x, y, r1, 0, 2 * Math.PI, true);
-  ctx.closePath();
-
-  ctx.fillStyle = color;
-  ctx.fill();
-}
-
-const drawLine = (start1, start2, end1, end2, color = '#000') => {
-  ctx.beginPath();
-  ctx.moveTo(start1, start2);
-  ctx.lineTo(end1, end2);
-  ctx.strokeStyle = color;
-  ctx.stroke();
-  ctx.closePath();
-}
-
+// 绘制图标
 function drawImageOnArc(x, y, r, angle, image, imageSize) {
   // 转换为弧度
   angle = (angle - 90) * Math.PI / 180;
@@ -244,62 +274,8 @@ function drawImageOnArc(x, y, r, angle, image, imageSize) {
   }
 }
 
-// 判断是否点击坐标是否在目标圆内
-function isPointInCircle({ x, y, r, angle, circle_r, pointX, pointY }) {
-  ctx.beginPath();
-  // 转换为弧度
-  angle = (angle - 90) * Math.PI / 180;
-  // 计算第二个圆的圆心坐标
-  var secondX = x + Math.cos(angle) * r;
-  var secondY = y + Math.sin(angle) * r;
-  // 保存绘制圆的路径
-  ctx.arc(secondX, secondY, circle_r, 0, 2 * Math.PI);
-  // 判断点是否在路径内
-  return ctx.isPointInPath(pointX, pointY);
-}
 
-function getTimeFromAngle(angle) {
-  // 将角度转换为0-360范围内
-  angle = angle % 360;
-  if (angle < 0) {
-    angle += 360;
-  }
-
-  // 计算小时和分钟
-  var totalMinutes = Math.round(angle / 360 * 24 * 60);
-  var hours = Math.floor(totalMinutes / 60);
-  var minutes = Math.round((totalMinutes % 60) / 5) * 5;
-
-  // 格式化小时和分钟
-  var formattedHours = hours.toString().padStart(2, '0');
-  var formattedMinutes = minutes.toString().padStart(2, '0');
-
-  return formattedHours + ':' + formattedMinutes;
-}
-
-const drawScale = () => {
-  ctx.save();
-  // 画制时钟刻度
-  // 定义1°
-  var pi = Math.PI * 2 / 360;
-  for (var i = 0; i < (24 * 4); i++) {
-    var x = -Math.cos(pi * (360 / (24 * 4)) * i);
-    var y = Math.sin(pi * (360 / (24 * 4)) * i);
-    if (i % 8 == 0) {
-      // 绘制时钟数字
-      ctx.lineWidth = 1;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.font = `bold ${layout.scale_font_size}px 微软雅黑`;
-      ctx.fillStyle = i % 24 === 0 ? colorConfig.light : colorConfig.shallowlight;
-      ctx.fillText(i / 4, layout.centerX + layout.scale_number_R * y, layout.centerX + layout.scale_number_R * x);
-    }
-    ctx.lineWidth = 0.8;
-    const lineLength = i % 4 == 0 ? 6 : 3;
-    drawLine(layout.centerX + layout.scale_R * x, layout.centerY + layout.scale_R * y, layout.centerX + (layout.scale_R - lineLength) * x, layout.centerX + (layout.scale_R - lineLength) * y, colorConfig.shallowlight)
-  }
-}
-
+// 绘制拖动条纹路
 function drawLinesOnArc(x, y, r, startAngle, endAngle, lineLength, angleOffset = 7) {
   r = r - lineLength / 2;
   // 转换为弧度
@@ -330,11 +306,106 @@ function drawLinesOnArc(x, y, r, startAngle, endAngle, lineLength, angleOffset =
   }
 }
 
+/**
+ * @desc: 背景绘制
+ */
+// 基础背景
+const drawBackground = () => {
+  ctx.beginPath();
+  ctx.arc(layout.centerX, layout.centerY, layout.R1, 0, Math.PI * 2);
+  ctx.fillStyle = colorConfig.shallowDark;
+  ctx.fill
+  ctx.fill()
+  ctx.moveTo(layout.centerX + layout.R2, layout.centerY);
+  ctx.arc(layout.centerX, layout.centerY, layout.R2, 0, Math.PI * 2, true);
+  ctx.fillStyle = colorConfig.dark;
+  ctx.fill()
+  ctx.restore()
+}
+
+// 绘制圆环
+function clearRing(x, y, r1, r2, color = colorConfig.dark) {
+  ctx.beginPath();
+  ctx.arc(x, y, r2, 0, 2 * Math.PI);
+  ctx.arc(x, y, r1, 0, 2 * Math.PI, true);
+  ctx.closePath();
+
+  ctx.fillStyle = color;
+  ctx.fill();
+}
+
+// 绘制线条
+const drawLine = (start1, start2, end1, end2, color = '#000') => {
+  ctx.beginPath();
+  ctx.moveTo(start1, start2);
+  ctx.lineTo(end1, end2);
+  ctx.strokeStyle = color;
+  ctx.stroke();
+  ctx.closePath();
+}
+
+// 判断是否点击坐标是否在目标圆内
+function isClickInCircle({ x, y, r, angle, circle_r, pointX, pointY }) {
+  ctx.beginPath();
+  // 转换为弧度
+  angle = (angle - 90) * Math.PI / 180;
+  // 计算第二个圆的圆心坐标
+  var secondX = x + Math.cos(angle) * r;
+  var secondY = y + Math.sin(angle) * r;
+  // 保存绘制圆的路径
+  ctx.arc(secondX, secondY, circle_r, 0, 2 * Math.PI);
+  // 判断点是否在路径内
+  return ctx.isPointInPath(pointX, pointY);
+}
+
+// 计算时间
+function getTimeFromAngle(angle) {
+  // 将角度转换为0-360范围内
+  angle = angle % 360;
+  if (angle < 0) {
+    angle += 360;
+  }
+
+  // 计算小时和分钟
+  var totalMinutes = Math.round(angle / 360 * 24 * 60);
+  var hours = Math.floor(totalMinutes / 60);
+  var minutes = Math.round((totalMinutes % 60) / 5) * 5;
+
+  // 格式化小时和分钟
+  var formattedHours = hours.toString().padStart(2, '0');
+  var formattedMinutes = minutes.toString().padStart(2, '0');
+
+  return formattedHours + ':' + formattedMinutes;
+}
+
+// 绘制时钟表盘刻度
+const drawScale = () => {
+  // 画制时钟刻度
+  // 定义1°
+  var pi = Math.PI * 2 / 360;
+  for (var i = 0; i < (24 * 4); i++) {
+    var x = -Math.cos(pi * (360 / (24 * 4)) * i);
+    var y = Math.sin(pi * (360 / (24 * 4)) * i);
+    if (i % 8 == 0) {
+      // 绘制时钟数字
+      ctx.lineWidth = 1;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.font = `bold ${layout.scale_font_size}px 微软雅黑`;
+      ctx.fillStyle = i % 24 === 0 ? colorConfig.light : colorConfig.shallowlight;
+      ctx.fillText(i / 4, layout.centerX + layout.scale_number_R * y, layout.centerX + layout.scale_number_R * x);
+    }
+    ctx.lineWidth = 0.8;
+    const lineLength = i % 4 == 0 ? 6 : 3;
+    drawLine(layout.centerX + layout.scale_R * x, layout.centerY + layout.scale_R * y, layout.centerX + (layout.scale_R - lineLength) * x, layout.centerX + (layout.scale_R - lineLength) * y, colorConfig.shallowlight)
+  }
+}
+
 </script>
 
 <style lang="scss" scoped>
 .canvas {
   image-rendering: high-quality;
-  
+
 }
 </style>
