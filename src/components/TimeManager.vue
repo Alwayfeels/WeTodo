@@ -1,17 +1,24 @@
 <template>
-  <div>
-    <canvas id="canvas" ref="canvasRef" class="canvas" :style="`width: ${layout.width}px; height: ${layout.height}px;`"
-      :width="layout.width" :height="layout.height"></canvas>
-    <div>{{ clockValue }}</div>
-    <div>点击角度 {{ state.clickAngle }}</div>
-    <div>当前角度 {{ state.moveAngle }}</div>
-    <div>转动角度差 {{ state.dragOffsetAngle }}</div>
-    <div>开始角度 {{ state.dragBarStartAngle }}</div>
-    <div>结束角度 {{ state.dragBarEndAngle }}</div>
-    <div>isStartIconClick {{ state.isStartIconClick }}</div>
-    <div>isEndIconClick {{ state.isEndIconClick }}</div>
-    <div>dragBarAngle {{ state.dragBarAngle }}</div>
-    
+  <div style="display: flex; width: 60vw;">
+    <div style="width: 20vw; display: flex; align-items: flex-start; flex-direction: column;">
+      <div style="font-weight: bold;">配置参数</div>
+      <div>
+        <div v-for="key in Object.keys(layout)" :key="key" style="text-align: left;">{{ key }}: {{ layout[key] }}</div>
+      </div>
+    </div>
+    <div style="flex: 1">
+      <canvas id="canvas" ref="canvasRef" class="canvas" :style="`width: ${layout.width}px; height: ${layout.height}px;`"
+        :width="layout.width" :height="layout.height"></canvas>
+      <div>{{ clockValue }}</div>
+      <div>点击角度 {{ state.clickAngle }}</div>
+      <div>当前角度 {{ state.moveAngle }}</div>
+      <div>转动角度差 {{ state.dragOffsetAngle }}</div>
+      <div>开始角度 {{ state.dragBarStartAngle }}</div>
+      <div>结束角度 {{ state.dragBarEndAngle }}</div>
+      <div>isStartIconClick {{ state.isStartIconClick }}</div>
+      <div>isEndIconClick {{ state.isEndIconClick }}</div>
+      <div>dragBarAngle {{ state.dragBarAngle }}</div>
+    </div>
   </div>
 </template>
 
@@ -41,7 +48,7 @@ const layout = reactive({
   drag_bar_scale_width: 20,
   centerX: computed(() => layout.width / 2),
   centerY: computed(() => layout.height / 2),
-  dragBarMinAngle: 20,
+  dragBarMinAngle: 40,
   dragBarMaxAngle: 300
 });
 const colorConfig = reactive({
@@ -83,20 +90,6 @@ onMounted(() => {
   drawClockBg()
   ctx.save()
   drawDragBar(layout.dragBarStartAngleInit, layout.dragBarEndAngleInit)
-  drawCircleAtPosition({
-    x: layout.centerX,
-    y: layout.centerY,
-    r: layout.drag_bar_R,
-    angle: state.dragBarStartAngle,
-    circle_r: layout.drag_icon_size,
-  })
-  drawCircleAtPosition({
-    x: layout.centerX,
-    y: layout.centerY,
-    r: layout.drag_bar_R,
-    angle: state.dragBarEndAngle,
-    circle_r: layout.drag_icon_size,
-  })
   canvasDom = document.getElementById('canvas')
   addCanvasEventListener()
 })
@@ -157,14 +150,15 @@ function onCanvasMouseMove(event) {
   let currAngle = Math.round(calculateAngle({ x: layout.centerX, y: layout.centerY, pointX: offsetX, pointY: offsetY }))
   if (state.moveAngle === currAngle) return
   state.moveAngle = currAngle
-  const newStartAngle = state.isStartIconClick ? Math.round(currAngle + state.dragOffsetAngle): state.dragBarStartAngle 
-  const newEndAngle = state.isEndIconClick ? Math.round(currAngle  + state.dragOffsetAngle): state.dragBarEndAngle
-  console.log('拖拽偏转角度 => ', state.dragOffsetAngle);
+  let newStartAngle = state.isStartIconClick ? Math.round(currAngle + state.dragOffsetAngle): state.dragBarStartAngle 
+  let newEndAngle = state.isEndIconClick ? Math.round(currAngle  + state.dragOffsetAngle): state.dragBarEndAngle
+  newEndAngle = formatAngle(newEndAngle)
+  newStartAngle = formatAngle(newStartAngle)
 
   state.dragBarStartAngle = newStartAngle
   state.dragBarEndAngle = newEndAngle
   if (state.dragBarAngle <= layout.dragBarMinAngle) {
-    console.log('\\\\\\\\\\\\\\\\\\');
+    // console.log('\\\\\\\\\\\\\\\\\\');
     if (state.isStartIconClick) {
       state.dragBarEndAngle = (state.dragBarStartAngle + layout.dragBarMinAngle) % 360
     }
@@ -173,7 +167,7 @@ function onCanvasMouseMove(event) {
     }
   }
   if (state.dragBarAngle >= layout.dragBarMaxAngle) {
-    console.log('////////////');
+    // console.log('////////////');
     if (state.isStartIconClick) {
       state.dragBarEndAngle = (state.dragBarStartAngle + layout.dragBarMaxAngle) % 360
     }
@@ -181,8 +175,20 @@ function onCanvasMouseMove(event) {
       state.dragBarStartAngle = (state.dragBarEndAngle - layout.dragBarMaxAngle) % 360
     }
   }
-  console.log('重绘角度 => ', newStartAngle, newEndAngle);
+  // console.log('重绘角度 => ', newStartAngle, newEndAngle);
   drawDragBar(newStartAngle, newEndAngle)
+}
+
+// 格式化度数，始终为0-360
+function formatAngle(angle) {
+  while (angle < 0 || angle >= 360) {
+    if (angle < 0) {
+      angle += 360;
+    } else if (angle >= 360) {
+      angle -= 360;
+    }
+  }
+  return angle;
 }
 
 function calculateAngle({ x, y, pointX, pointY }) {
@@ -212,19 +218,33 @@ function rotateDragBar(angle) {
 }
 
 function drawDragBar(startAngle = 0, endAngle = 90) {
-  if (startAngle >= 360 || endAngle >= 360) {
-    startAngle = startAngle % 360
-    endAngle = endAngle % 360
-  }
+  startAngle = formatAngle(startAngle)
+  endAngle = formatAngle(endAngle)
   clearRing(layout.centerX, layout.centerY, (layout.drag_bar_R - layout.drag_bar_width), (layout.drag_bar_R + layout.drag_bar_width))
   clockValue.value = `${startAngle}°-${endAngle}°: ${getTimeFromAngle(startAngle)}-${getTimeFromAngle(endAngle)}`
   drawDragBarContent(layout.centerX, layout.centerY, layout.drag_bar_R, startAngle, endAngle, layout.drag_bar_width);
-  drawLinesOnArc(layout.centerX, layout.centerY, layout.drag_bar_R, startAngle, endAngle, layout.drag_scale_length);
+  drawLinesOnArc({ x: layout.centerX, y: layout.centerY, r: layout.drag_bar_R, startAngle, endAngle, lineLength: layout.drag_scale_length});
+  drawCircleAtPosition({
+    x: layout.centerX,
+    y: layout.centerY,
+    r: layout.drag_bar_R,
+    angle: state.dragBarStartAngle,
+    circle_r: layout.drag_icon_size - 4,
+    color: state.isStartIconClick ? colorConfig.dark : colorConfig.shallowDark
+  })
+  drawCircleAtPosition({
+    x: layout.centerX,
+    y: layout.centerY,
+    r: layout.drag_bar_R,
+    angle: state.dragBarEndAngle,
+    circle_r: layout.drag_icon_size - 4,
+    color: state.isEndIconClick ? colorConfig.dark : colorConfig.shallowDark
+  })
   drawImageOnArc(layout.centerX, layout.centerY, layout.drag_bar_R, startAngle, bed_icon, layout.drag_icon_size)
   drawImageOnArc(layout.centerX, layout.centerY, layout.drag_bar_R, endAngle, bell_icon, layout.drag_icon_size)
 }
 
-function drawCircleAtPosition({ x, y, r, angle, circle_r }) {
+function drawCircleAtPosition({ x, y, r, angle, circle_r, color = colorConfig.shallowDark }) {
   // 转换为弧度
   const arc = (angle - 90) * Math.PI / 180;
 
@@ -235,7 +255,7 @@ function drawCircleAtPosition({ x, y, r, angle, circle_r }) {
   // 绘制圆
   ctx.beginPath();
   ctx.arc(secondX, secondY, circle_r, 0, 2 * Math.PI);
-  ctx.fillStyle = colorConfig.shallowDark
+  ctx.fillStyle = color
   ctx.fill();
 }
 
@@ -298,10 +318,10 @@ function drawImageOnArc(x, y, r, angle, image, imageSize) {
 
 
 // 绘制拖动条纹路
-function drawLinesOnArc(x, y, r, startAngle, endAngle, lineLength, angleOffset = 7, lineGap = 3) {
+function drawLinesOnArc({ x, y, r, startAngle = 0, endAngle = 360, lineLength, angleOffset = 7, lineGap = 3 }) {
   r = r - lineLength / 2;
   // 转换为弧度
-  startAngle = (startAngle + angleOffset - 90) * Math.PI / 180; // 偏转7度以容纳起止图标
+  startAngle = (startAngle + angleOffset - 90) * Math.PI / 180; 
   endAngle = (endAngle - angleOffset - 90) * Math.PI / 180;
 
   // 计算直线起点和终点的坐标
