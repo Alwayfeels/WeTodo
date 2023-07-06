@@ -41,10 +41,10 @@ const layout = reactive({
   scale_number_R: 75,
   bg_icon_R: 50,
   bg_icon_size: 26,
-  dragBarStartAngleInit: 45,
-  dragBarEndAngleInit: 180,
+  dragBarStartAngleInit: 90,
+  dragBarEndAngleInit: 270,
   drag_icon_size: 20,
-  drag_scale_length: 16,
+  drag_scale_length: 14,
   drag_bar_R: 125,
   drag_bar_width: 20,
   drag_bar_scale_width: 20,
@@ -69,10 +69,10 @@ const state = reactive({
   isStartIconClick: false, // 是否点击了头部图标
   isEndIconClick: false, // 是否点击了尾部图标
   isDragBarClick: false, // 是否点击了拖拽条
-  dragBarStartAngle: 45, // 拖拽条 开始角度
-  dragBarEndAngle: 180, // 拖拽条 结束角度
-  oldDragBarStartAngle: 45, // 旧的拖拽条 开始角度
-  oldDragBarEndAngle: 180, // 旧的拖拽条 结束角度
+  dragBarStartAngle: layout.dragBarStartAngleInit, // 拖拽条 开始角度
+  dragBarEndAngle: layout.dragBarEndAngleInit, // 拖拽条 结束角度
+  oldDragBarStartAngle: layout.dragBarStartAngleInit, // 旧的拖拽条 开始角度
+  oldDragBarEndAngle: layout.dragBarEndAngleInit, // 旧的拖拽条 结束角度
   // 拖拽条的弧长
   dragBarAngle: computed(() => state.dragBarStartAngle > state.dragBarEndAngle ? 360 - state.dragBarStartAngle + state.dragBarEndAngle : state.dragBarEndAngle - state.dragBarStartAngle),
 })
@@ -97,20 +97,6 @@ onMounted(() => {
   drawClockBg()
   ctx.save()
   drawDragBar(layout.dragBarStartAngleInit, layout.dragBarEndAngleInit)
-  drawCircleAtPosition({
-    x: layout.centerX,
-    y: layout.centerY,
-    r: layout.drag_bar_R,
-    angle: state.dragBarStartAngle,
-    circle_r: layout.drag_icon_size,
-  })
-  drawCircleAtPosition({
-    x: layout.centerX,
-    y: layout.centerY,
-    r: layout.drag_bar_R,
-    angle: state.dragBarEndAngle,
-    circle_r: layout.drag_icon_size,
-  })
   canvasDom = document.getElementById('canvas')
   addCanvasEventListener()
 })
@@ -238,24 +224,38 @@ function drawClockBg() {
   drawScale()
 }
 
-function rotateDragBar(angle) {
-  ctx.restore()
-  const perAngle = Math.PI / 180
-  ctx.rotate(angle * perAngle); // 45度角
-}
-
 function drawDragBar(startAngle = 0, endAngle = 90) {
-  if (startAngle >= 360 || endAngle >= 360) {
-    startAngle = startAngle % 360
-    endAngle = endAngle % 360
-  }
+  startAngle = formatAngle(startAngle)
+  endAngle = formatAngle(endAngle)
   clockValue.value = `${startAngle}°-${endAngle}°: ${getTimeFromAngle(startAngle)}-${getTimeFromAngle(endAngle)}`
-  clearRing(layout.centerX, layout.centerY, (layout.drag_bar_R - layout.drag_bar_width), (layout.drag_bar_R + layout.drag_bar_width))
-  drawDragBarContent(layout.centerX, layout.centerY, layout.drag_bar_R, startAngle, endAngle, layout.drag_bar_width);
-  renderIconActiveBg()
-  drawLinesOnArc({ x: layout.centerX, y: layout.centerY, r: layout.drag_bar_R, startAngle, endAngle, lineLength: layout.drag_scale_length});
-  // drawImageOnArc(layout.centerX, layout.centerY, layout.drag_bar_R, startAngle, bed_icon, layout.drag_icon_size)
-  // drawImageOnArc(layout.centerX, layout.centerY, layout.drag_bar_R, endAngle, bell_icon, layout.drag_icon_size)
+  drawDragBarContent({x: layout.centerX, y: layout.centerY, r: layout.drag_bar_R, startAngle, endAngle, lineWidth: layout.drag_bar_width * 2 });
+  drawLinesOnArc({ x: layout.centerX, y: layout.centerY, r: layout.drag_bar_R, startAngle, lineLength: layout.drag_scale_length});
+  drawDragBarContent({
+    x: layout.centerX, 
+    y: layout.centerY, 
+    r: layout.drag_bar_R,
+    lineWidth: layout.drag_bar_width * 2,
+    startAngle: state.dragBarEndAngle,
+    endAngle: state.dragBarStartAngle,
+    color: colorConfig.dark
+  })
+  drawCircleAtPosition({
+    x: layout.centerX,
+    y: layout.centerY,
+    r: layout.drag_bar_R,
+    angle: state.dragBarStartAngle,
+    circle_r: layout.drag_icon_size,
+  })
+  drawCircleAtPosition({
+    x: layout.centerX,
+    y: layout.centerY,
+    r: layout.drag_bar_R,
+    angle: state.dragBarEndAngle,
+    circle_r: layout.drag_icon_size,
+  })
+  // renderIconActiveBg()
+  drawImageOnArc(layout.centerX, layout.centerY, layout.drag_bar_R, startAngle, bed_icon, layout.drag_icon_size)
+  drawImageOnArc(layout.centerX, layout.centerY, layout.drag_bar_R, endAngle, bell_icon, layout.drag_icon_size)
 }
 
 function renderIconActiveBg() {
@@ -296,17 +296,39 @@ function drawCircleAtPosition({ x, y, r, angle, circle_r }) {
  * @desc: 操作条
  */
 
-function drawDragBarContent(x, y, r, startAngle, endAngle, arc_r) {
+function drawDragBarContent({x, y, r, startAngle, endAngle, lineWidth, color = colorConfig.shallowDark, lineCap = 'butt'}) {
   // 转换为弧度
   startAngle = (startAngle - 90) * Math.PI / 180;
   endAngle = (endAngle - 90) * Math.PI / 180;
 
   ctx.beginPath();
-  ctx.lineWidth = arc_r * 2; // 设置线条宽度为 arc_r 的两倍
-  ctx.lineCap = 'round'; // 设置线条末端样式为圆形
+  ctx.lineWidth = lineWidth; // 设置线条宽度为 arc_r 的两倍
+  ctx.lineCap = lineCap;
   ctx.arc(x, y, r, startAngle, endAngle);
-  ctx.strokeStyle = colorConfig.shallowDark;
+  ctx.strokeStyle = color;
   ctx.stroke();
+}
+
+// 绘制拖动条纹路
+function drawLinesOnArc({x, y, r, startAngle = 0, lineLength, lineWidth = 1.6, lineGap = 3}) {
+  ctx.beginPath();
+  ctx.closePath();
+
+  for (var angle = startAngle; angle < startAngle + 360; angle += lineGap) {
+    var radians = angle * Math.PI / 180;
+    var startX = x + (r - lineLength/2) * Math.sin(radians);
+    var startY = y - (r - lineLength/2) * Math.cos(radians);
+    var endX = x + (r + lineLength/2) * Math.sin(radians);
+    var endY = y - (r + lineLength/2) * Math.cos(radians);
+
+    ctx.moveTo(startX, startY);
+    ctx.lineTo(endX, endY);
+  }
+  ctx.lineWidth = lineWidth
+  ctx.strokeStyle = colorConfig.shallowlight
+  ctx.stroke(); // 绘制刻度线
+  // 返回绘制结果
+  return canvas;
 }
 
 function isPointInDragBar({ x, y, r, startAngle, endAngle, lineWidth, pointX, pointY }) {
@@ -349,40 +371,6 @@ function drawImageOnArc(x, y, r, angle, image, imageSize) {
   }
 }
 
-
-// 绘制拖动条纹路
-function drawLinesOnArc(x, y, r, startAngle, endAngle, lineLength, angleOffset = 7, lineGap = 3) {
-  r = r - lineLength / 2;
-  // 转换为弧度
-  startAngle = (startAngle + angleOffset - 90) * Math.PI / 180; // 偏转7度以容纳起止图标
-  endAngle = (endAngle - angleOffset - 90) * Math.PI / 180;
-
-  // 计算直线起点和终点的坐标
-  var startX = x + Math.cos(startAngle) * (r + lineLength);
-  var startY = y + Math.sin(startAngle) * (r + lineLength);
-  var endX = x + Math.cos(startAngle) * r;
-  var endY = y + Math.sin(startAngle) * r;
-
-  // 设置线条样式
-  ctx.strokeStyle = colorConfig.shallowlight;
-  ctx.lineWidth = 1;
-
-  // 逐度绘制直线
-  for (var angle = startAngle + 1 * Math.PI / 180; angle <= endAngle; angle += lineGap * Math.PI / 180) {
-    startX = x + Math.cos(angle) * (r + lineLength);
-    startY = y + Math.sin(angle) * (r + lineLength);
-    endX = x + Math.cos(angle) * r;
-    endY = y + Math.sin(angle) * r;
-
-    ctx.beginPath();
-    ctx.moveTo(startX, startY);
-    ctx.lineTo(endX, endY);
-    ctx.lineWidth = 2
-    ctx.strokeStyle = colorConfig.dark
-    ctx.stroke();
-  }
-}
-
 /**
  * @desc: 背景绘制
  */
@@ -401,10 +389,28 @@ const drawBackground = () => {
 }
 
 // 绘制圆环
-function clearRing(x, y, r1, r2, color = colorConfig.dark) {
+function clearRing({x, y, r1, r2, startAngle, endAngle, color = colorConfig.dark}) {
+  // 转换为弧度
+  startAngle = (startAngle - 90) * Math.PI / 180;
+  endAngle = (endAngle - 90) * Math.PI / 180;
   ctx.beginPath();
-  ctx.arc(x, y, r2, 0, 2 * Math.PI);
-  ctx.arc(x, y, r1, 0, 2 * Math.PI, true);
+  
+  ctx.arc(x, y, r2, startAngle, endAngle);
+  ctx.arc(x, y, r1, startAngle, endAngle, true);
+  ctx.closePath();
+
+  ctx.fillStyle = color;
+  ctx.fill();
+}
+
+// fillArcZone
+function fillArcZone({ x, y, r1, r2, startAngle, endAngle, color = colorConfig.dark }) {
+  // 绘制扇形区域并填充颜色
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  ctx.arc(x, y, r2, startAngle, endAngle);
+  ctx.lineTo(x + r1 * Math.cos(endAngle), y + r1 * Math.sin(endAngle));
+  ctx.arc(x, y, r1, endAngle, startAngle, true);
   ctx.closePath();
 
   ctx.fillStyle = color;
@@ -468,10 +474,7 @@ function formatAngle(angle) {
 // 计算时间
 function getTimeFromAngle(angle) {
   // 将角度转换为0-360范围内
-  angle = angle % 360;
-  if (angle < 0) {
-    angle += 360;
-  }
+  angle = formatAngle(angle)
 
   // 计算小时和分钟
   var totalMinutes = Math.round(angle / 360 * 24 * 60);
