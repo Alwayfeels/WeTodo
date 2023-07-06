@@ -120,7 +120,7 @@ function addCanvasEventListener() {
       })
     })
     // 是否点击了dragBar本身
-    const isDragBarClick = isPointInArcShape({
+    const isDragBarClick = isPointInArcZone({
       x: layout.centerX,
       y: layout.centerY,
       r1: layout.drag_bar_R - layout.drag_bar_width,
@@ -185,6 +185,23 @@ function onCanvasMouseMove(event) {
     state.dragBarStartAngle = formatAngle(state.dragMoveAngle + state.oldDragBarStartAngle) // 新的开始角度
     state.dragBarEndAngle = formatAngle(state.dragMoveAngle + state.oldDragBarEndAngle) // 新的结束角度
   }
+  // min/max limit
+  if (state.dragBarAngle <= layout.dragBarMinAngle) {
+    if (state.isStartIconClick) {
+      state.dragBarEndAngle = (state.dragBarStartAngle + layout.dragBarMinAngle) % 360
+    }
+    if (state.isEndIconClick) {
+      state.dragBarStartAngle = (state.dragBarEndAngle - layout.dragBarMinAngle) % 360
+    }
+  }
+  if (state.dragBarAngle >= layout.dragBarMaxAngle) {
+    if (state.isStartIconClick) {
+      state.dragBarEndAngle = (state.dragBarStartAngle + layout.dragBarMaxAngle) % 360
+    }
+    if (state.isEndIconClick) {
+      state.dragBarStartAngle = (state.dragBarEndAngle - layout.dragBarMaxAngle) % 360
+    }
+  }
   drawDragBar(state.dragBarStartAngle, state.dragBarEndAngle)
 }
 
@@ -205,9 +222,9 @@ function drawDragBar(startAngle = 0, endAngle = 90) {
   startAngle = formatAngle(startAngle)
   endAngle = formatAngle(endAngle)
   clockValue.value = `${startAngle}°-${endAngle}°: ${getTimeFromAngle(startAngle)}-${getTimeFromAngle(endAngle)}`
-  drawDragBarContent({ x: layout.centerX, y: layout.centerY, r: layout.drag_bar_R, startAngle, endAngle, lineWidth: layout.drag_bar_width * 2 });
+  drawArc({ x: layout.centerX, y: layout.centerY, r: layout.drag_bar_R, startAngle, endAngle, lineWidth: layout.drag_bar_width * 2 });
   drawLinesOnArc({ x: layout.centerX, y: layout.centerY, r: layout.drag_bar_R, startAngle, lineLength: layout.drag_scale_length });
-  drawDragBarContent({
+  drawArc({
     x: layout.centerX,
     y: layout.centerY,
     r: layout.drag_bar_R,
@@ -272,7 +289,7 @@ function drawCircleAtPosition({ x, y, r, angle, circle_r }) {
  * @desc: 操作条
  */
 
-function drawDragBarContent({ x, y, r, startAngle, endAngle, lineWidth, color = colorConfig.shallowDark, lineCap = 'butt' }) {
+function drawArc({ x, y, r, startAngle, endAngle, lineWidth, color = colorConfig.shallowDark, lineCap = 'butt' }) {
   // 转换为弧度
   startAngle = (startAngle - 90) * Math.PI / 180;
   endAngle = (endAngle - 90) * Math.PI / 180;
@@ -403,6 +420,32 @@ const drawLine = (start1, start2, end1, end2, color = '#000') => {
   ctx.closePath();
 }
 
+// 绘制时钟表盘刻度
+const drawScale = () => {
+  // 画制时钟刻度
+  // 定义1°
+  var pi = Math.PI * 2 / 360;
+  for (var i = 0; i < (24 * 4); i++) {
+    var x = -Math.cos(pi * (360 / (24 * 4)) * i);
+    var y = Math.sin(pi * (360 / (24 * 4)) * i);
+    if (i % 8 == 0) {
+      // 绘制时钟数字
+      ctx.lineWidth = 1;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.font = `bold ${layout.scale_font_size}px 微软雅黑`;
+      ctx.fillStyle = i % 24 === 0 ? colorConfig.light : colorConfig.shallowlight;
+      ctx.fillText(i / 4, layout.centerX + layout.scale_number_R * y, layout.centerX + layout.scale_number_R * x);
+    }
+    ctx.lineWidth = 0.8;
+    const lineLength = i % 4 == 0 ? 6 : 3;
+    drawLine(layout.centerX + layout.scale_R * x, layout.centerY + layout.scale_R * y, layout.centerX + (layout.scale_R - lineLength) * x, layout.centerX + (layout.scale_R - lineLength) * y, colorConfig.shallowlight)
+  }
+}
+
+/**
+ * @desc: 判断落点函数 ============================
+ */
 // 判断是否点击坐标是否在目标圆内
 function isClickInCircle({ x, y, r, angle, circle_r, pointX, pointY }) {
   ctx.beginPath();
@@ -413,27 +456,29 @@ function isClickInCircle({ x, y, r, angle, circle_r, pointX, pointY }) {
   var secondY = y + Math.sin(angle) * r;
   // 保存绘制圆的路径
   ctx.arc(secondX, secondY, circle_r, 0, 2 * Math.PI);
+  ctx.closePath();
   // 判断点是否在路径内
   return ctx.isPointInPath(pointX, pointY);
 }
 
-function isPointInArcShape({ x, y, r1, r2, startAngle, endAngle, pointX, pointY }) {
+// 判断落点是否在目标扇形区域内
+function isPointInArcZone({ x, y, r1, r2, startAngle, endAngle, pointX, pointY }) {
+  // 转换为弧度
+  startAngle = (startAngle - 90) * Math.PI / 180;
+  endAngle = (endAngle - 90) * Math.PI / 180;
 
-  // 设置 canvas 大小，根据圆弧的外径和起始角度、结束角度来确定
-  var width = Math.max(r1, r2) * 2;
-  var height = Math.max(r1, r2) * 2;
-  canvas.width = width;
-  canvas.height = height;
-
-  // 绘制圆弧路径
   ctx.beginPath();
+  ctx.moveTo(x + r1 * Math.cos(startAngle), y + r1 * Math.sin(startAngle));
   ctx.arc(x, y, r2, startAngle, endAngle);
+  ctx.lineTo(x + r1 * Math.cos(endAngle), y + r1 * Math.sin(endAngle));
   ctx.arc(x, y, r1, endAngle, startAngle, true);
   ctx.closePath();
-
-  // 判断目标点是否在路径内
   return ctx.isPointInPath(pointX, pointY);
 }
+
+/**
+ * @desc: 辅助计算函数 ===============
+ */
 
 // 格式化度数，始终为0-360
 function formatAngle(angle) {
@@ -462,29 +507,6 @@ function getTimeFromAngle(angle) {
   var formattedMinutes = minutes.toString().padStart(2, '0');
 
   return formattedHours + ':' + formattedMinutes;
-}
-
-// 绘制时钟表盘刻度
-const drawScale = () => {
-  // 画制时钟刻度
-  // 定义1°
-  var pi = Math.PI * 2 / 360;
-  for (var i = 0; i < (24 * 4); i++) {
-    var x = -Math.cos(pi * (360 / (24 * 4)) * i);
-    var y = Math.sin(pi * (360 / (24 * 4)) * i);
-    if (i % 8 == 0) {
-      // 绘制时钟数字
-      ctx.lineWidth = 1;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.font = `bold ${layout.scale_font_size}px 微软雅黑`;
-      ctx.fillStyle = i % 24 === 0 ? colorConfig.light : colorConfig.shallowlight;
-      ctx.fillText(i / 4, layout.centerX + layout.scale_number_R * y, layout.centerX + layout.scale_number_R * x);
-    }
-    ctx.lineWidth = 0.8;
-    const lineLength = i % 4 == 0 ? 6 : 3;
-    drawLine(layout.centerX + layout.scale_R * x, layout.centerY + layout.scale_R * y, layout.centerX + (layout.scale_R - lineLength) * x, layout.centerX + (layout.scale_R - lineLength) * y, colorConfig.shallowlight)
-  }
 }
 
 </script>
