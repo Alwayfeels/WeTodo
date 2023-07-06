@@ -10,16 +10,16 @@
       <canvas id="canvas" ref="canvasRef" class="canvas" :style="`width: ${layout.width}px; height: ${layout.height}px;`"
         :width="layout.width" :height="layout.height"></canvas>
       <div>{{ clockValue }}</div>
-      <div>点击角度 {{ state.clickAngle }}</div>
-      <div>当前角度 {{ state.mouseAngle }}</div>
-      <div>转动角度差 {{ state.dragOffsetAngle }}</div>
-      <div>开始角度 {{ state.dragBarStartAngle }}</div>
-      <div>结束角度 {{ state.dragBarEndAngle }}</div>
+      <div>点击角度 {{ state.clickAngle }}°</div>
+      <div>当前角度 {{ state.mouseAngle }}°</div>
+      <div>转动角度差 {{ state.dragOffsetAngle }}°</div>
+      <div>开始角度 {{ state.dragBarStartAngle }}°</div>
+      <div>结束角度 {{ state.dragBarEndAngle }}°</div>
+      <div>拖动条弧度 {{ state.dragBarAngle }}°</div>
+      <div>拖动条移动弧度 {{ state.dragMoveAngle }}°</div>
       <div>isStartIconClick {{ state.isStartIconClick }}</div>
       <div>isEndIconClick {{ state.isEndIconClick }}</div>
       <div>isDragBarClick {{ state.isDragBarClick }}</div>
-      <div>dragBarAngle {{ state.dragBarAngle }}</div>
-      <div>dragMoveAngle {{ state.dragMoveAngle }}</div>
     </div>
   </div>
 </template>
@@ -115,27 +115,10 @@ onMounted(() => {
   addCanvasEventListener()
 })
 
+
 function addCanvasEventListener() {
   canvasDom.addEventListener('mousedown', (event) => {
     const { offsetX, offsetY } = event
-    // 是否点击了dragbar
-    // const isClickDragBar = isPointInDragBar({
-    //   x: layout.centerX,
-    //   y: layout.centerY,
-    //   r: layout.drag_bar_R,
-    //   startAngle: state.dragBarStartAngle,
-    //   endAngle: state.dragBarEndAngle,
-    //   lineWidth: layout.drag_bar_width,
-    //   pointX: offsetX,
-    //   pointY: offsetY
-    // })
-    // if (isClickDragBar) {
-    //   console.log('rotate  eeeeeeeeee');
-    //   rotateDragBar(45)
-    // }
-    // console.log('isClickDragBar ??? => ', isClickDragBar);
-
-    console.log('click', offsetX, offsetY);
     // 是否点击了dragbar上的图标
     const [isStartIconClick, isEndIconClick] = ([state.dragBarStartAngle, state.dragBarEndAngle]).map(angle => {
       return isClickInCircle({
@@ -167,7 +150,6 @@ function addCanvasEventListener() {
       pointX: offsetX,
       pointY: offsetY
     })
-    console.log('isDragBarClick', isDragBarClick);
     if (isDragBarClick) {
       state.isDragBarClick = isDragBarClick
       state.clickAngle = Math.round(calculateAngle({ x: layout.centerX, y: layout.centerY, pointX: offsetX, pointY: offsetY }))
@@ -182,7 +164,7 @@ function addCanvasEventListener() {
     state.isEndIconClick = false
     state.isDragBarClick = false
     await nextTick()
-    renderIconBg()
+    // renderIconActiveBg()
     state.dragOffsetAngle = 0
     state.currAngle = 0
     state.clickAngle = 0
@@ -198,8 +180,8 @@ function onDragBarMouseMove(event) {
   if (state.mouseAngle === currAngle) return
   state.mouseAngle = currAngle // 鼠标的角度
   state.dragMoveAngle = currAngle - state.clickAngle // 拖动过的角度
-  state.dragBarStartAngle = formatAngle(dragMoveAngle + state.oldDragBarStartAngle) // 新的开始角度
-  state.dragBarEndAngle = formatAngle(dragMoveAngle + state.oldDragBarEndAngle) // 新的结束角度
+  state.dragBarStartAngle = formatAngle(state.dragMoveAngle + state.oldDragBarStartAngle) // 新的开始角度
+  state.dragBarEndAngle = formatAngle(state.dragMoveAngle + state.oldDragBarEndAngle) // 新的结束角度
   drawDragBar(state.dragBarStartAngle, state.dragBarEndAngle)
 }
 
@@ -249,8 +231,6 @@ function calculateAngle({ x, y, pointX, pointY }) {
   }
   return angle;
 }
-console.log('.....', calculateAngle({ x: 10, y: 10, pointX: 10, pointY: 20 }));
-
 function drawClockBg() {
   drawBackground()
   drawImageOnArc(layout.centerX, layout.centerY, layout.bg_icon_R, 0, sparkles_icon, layout.bg_icon_size)
@@ -269,16 +249,16 @@ function drawDragBar(startAngle = 0, endAngle = 90) {
     startAngle = startAngle % 360
     endAngle = endAngle % 360
   }
-  clearRing(layout.centerX, layout.centerY, (layout.drag_bar_R - layout.drag_bar_width), (layout.drag_bar_R + layout.drag_bar_width))
   clockValue.value = `${startAngle}°-${endAngle}°: ${getTimeFromAngle(startAngle)}-${getTimeFromAngle(endAngle)}`
+  clearRing(layout.centerX, layout.centerY, (layout.drag_bar_R - layout.drag_bar_width), (layout.drag_bar_R + layout.drag_bar_width))
   drawDragBarContent(layout.centerX, layout.centerY, layout.drag_bar_R, startAngle, endAngle, layout.drag_bar_width);
-  renderIconBg()
+  renderIconActiveBg()
   drawLinesOnArc({ x: layout.centerX, y: layout.centerY, r: layout.drag_bar_R, startAngle, endAngle, lineLength: layout.drag_scale_length});
-  drawImageOnArc(layout.centerX, layout.centerY, layout.drag_bar_R, startAngle, bed_icon, layout.drag_icon_size)
-  drawImageOnArc(layout.centerX, layout.centerY, layout.drag_bar_R, endAngle, bell_icon, layout.drag_icon_size)
+  // drawImageOnArc(layout.centerX, layout.centerY, layout.drag_bar_R, startAngle, bed_icon, layout.drag_icon_size)
+  // drawImageOnArc(layout.centerX, layout.centerY, layout.drag_bar_R, endAngle, bell_icon, layout.drag_icon_size)
 }
 
-function renderIconBg() {
+function renderIconActiveBg() {
   drawCircleAtPosition({
     x: layout.centerX,
     y: layout.centerY,
@@ -473,6 +453,18 @@ function isPointInArcShape({ x, y, r1, r2, startAngle, endAngle, pointX, pointY 
   return ctx.isPointInPath(pointX, pointY);
 }
 
+// 格式化度数，始终为0-360
+function formatAngle(angle) {
+  while (angle < 0 || angle >= 360) {
+    if (angle < 0) {
+      angle += 360;
+    } else if (angle >= 360) {
+      angle -= 360;
+    }
+  }
+  return angle;
+}
+
 // 计算时间
 function getTimeFromAngle(angle) {
   // 将角度转换为0-360范围内
@@ -519,8 +511,4 @@ const drawScale = () => {
 </script>
 
 <style lang="scss" scoped>
-.canvas {
-  image-rendering: high-quality;
-
-}
 </style>
