@@ -24,10 +24,10 @@
 
 <script setup>
 import { ref, h, computed, nextTick, watch, reactive, toRaw, onMounted } from "vue";
-import bed_icon from '../assets/bed.png'
-import bell_icon from '../assets/bell.png'
-import sparkles_icon from '../assets/sparkles.png'
-import sun_icon from '../assets/sun.png'
+import bed_icon from '../../public/bed.png'
+import bell_icon from '../../public/bell.png'
+import sparkles_icon from '../../public/sparkles.png'
+import sun_icon from '../../public/sun.png'
 
 const layout = reactive({
   width: 300,
