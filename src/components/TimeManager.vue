@@ -86,10 +86,10 @@ const state = reactive({
 // 静态加载图片
 function loadImages() {
   const imagesUrl = {
-    bed_icon: '/public/bed.png',
-    bell_icon: '/public/bell.png',
-    sparkles_icon: '/public/sparkles.png',
-    sun_icon: '/public/sun.png',
+    bed_icon: '/bed.png',
+    bell_icon: '/bell.png',
+    sparkles_icon: '/sparkles.png',
+    sun_icon: '/sun.png',
   }
   let loadSuccessNum = 0;
   for (let name of Object.keys(imagesUrl)) {
