@@ -1,13 +1,11 @@
 <script setup>
 import TodoItem from './components/TodoItem.vue'
 import TimeManager from './components/TimeManager.vue'
-import Timer from './components/Timer.vue'
 </script>
 
 <template>
   <TodoItem />
   <TimeManager />
-  <!-- <Timer /> -->
 </template>
 
 <style scoped>
